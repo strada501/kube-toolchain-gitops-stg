@@ -1,0 +1,209 @@
+---
+defaultBaseImageVersion: latest
+stages:
+- name: BUILD
+  inputs:
+  - type: git
+    branch: release
+    service: ${GIT_REPO}
+  triggers:
+  - type: git
+    events: 'push'
+  properties:
+  - name: IMAGE_NAME
+    value: ${APP_NAME}
+    type: text
+  jobs:
+  - name: Fetch code
+    type: builder
+    artifact_dir: ''
+    build_type: shell
+    script: |+
+      #!/bin/bash
+      # set -x
+
+      # Git repo cloned at $WORKING_DIR, copy into $ARCHIVE_DIR
+      mkdir -p $ARCHIVE_DIR
+      cp -R -n ./ $ARCHIVE_DIR/ || true
+
+      # Record git info
+      echo "GIT_URL=${GIT_URL}" >> $ARCHIVE_DIR/build.properties
+      echo "GIT_BRANCH=${GIT_BRANCH}" >> $ARCHIVE_DIR/build.properties
+      echo "GIT_COMMIT=${GIT_COMMIT}" >> $ARCHIVE_DIR/build.properties
+      echo "SOURCE_BUILD_NUMBER=${BUILD_NUMBER}" >> $ARCHIVE_DIR/build.properties
+      cat $ARCHIVE_DIR/build.properties
+
+      # check if doi is integrated in this toolchain
+      if jq -e '.services[] | select(.service_id=="draservicebroker")' _toolchain.json; then
+        # Record build information
+        ibmcloud login --apikey ${IBM_CLOUD_API_KEY} --no-region
+        ibmcloud doi publishbuildrecord --branch ${GIT_BRANCH} --repositoryurl ${GIT_URL} --commitid ${GIT_COMMIT} \
+          --buildnumber ${BUILD_NUMBER} --logicalappname ${IMAGE_NAME} --status pass
+      fi
+  - name: Unit Tests
+    type: tester
+    script: |-
+      #!/bin/bash
+      # set -x
+      if [ -f ./tests/run-tests.sh ]; then
+        source ./tests/run-tests.sh
+        RESULT=$?
+        if [ ! -z "${FILE_LOCATION}"]; then
+          if [ ${RESULT} -ne 0 ]; then STATUS=fail; else STATUS=pass; fi
+            if jq -e '.services[] | select(.service_id=="draservicebroker")' _toolchain.json; then
+              ibmcloud login --apikey ${IBM_CLOUD_API_KEY} --no-region
+              ibmcloud doi publishtestrecord --type unittest --buildnumber ${BUILD_NUMBER} --filelocation ${FILE_LOCATION} \
+                --buildnumber ${BUILD_NUMBER} --logicalappname ${IMAGE_NAME} --status ${STATUS}
+            fi
+          exit $RESULT
+        fi
+      else
+        echo "Test runner script not found: ./tests/run-tests.sh"
+      fi
+- name: CONTAINERIZE
+  properties:
+  - name: buildprops
+    value: build.properties
+    type: file
+  - name: DOCKER_ROOT
+    value: .
+    type: text
+  - name: DOCKER_FILE
+    value: Dockerfile
+    type: text
+  - name: PIPELINE_IMAGE_URL
+    value: undefined
+    type: text
+  - name: DEPLOYMENT_FILE
+    value: ./manifests/stg/deployment.yml
+    type: text
+  - name: DEPLOYMENT_FILE_ADDITIONAL
+    value: ./manifests/prod/deployment.yml
+    type: text
+  - name: GIT_USER_EMAIL
+    value: delivery-pipeline@example.com
+    type: text
+  - name: GIT_USER_NAME
+    value: delivery-pipeline
+    type: text
+  - name: GITLAB_ACCESS_TOKEN
+    value: ${GITLAB_ACCESS_TOKEN}
+    type: secure
+  - name: GITLAB_DOMAIN
+    value: ${GITLAB_DOMAIN}
+    type: text
+  - name: GITLAB_GROUP_NAME
+    value: ${GITLAB_GROUP_NAME}
+    type: text
+  - name: GITLAB_TOOLCHAIN_GROUP_NAME
+    value: ${GITLAB_TOOLCHAIN_GROUP_NAME}
+    type: text
+  - name: GITLAB_COMMONS_PROJECT_NAME
+    value: ${GITLAB_COMMONS_PROJECT_NAME}
+    type: text
+  - name: GITLAB_OPS_PROJECT_NAME
+    value: ${GITLAB_OPS_PROJECT_NAME}
+    type: text
+  - name: GITLAB_OPS_PROJECT_ID
+    value: ${GITLAB_OPS_PROJECT_ID}
+    type: text
+  - name: SOURCE_BRANCH_NAME
+    value: master
+    type: text
+  - name: TARGET_BRANCH_NAME
+    value: release
+    type: text
+  inputs:
+  - type: job
+    stage: BUILD
+    job: Fetch code
+  triggers:
+  - type: stage
+  jobs:
+  - name: Check dockerfile
+    type: tester
+    script: |-
+      #!/bin/bash
+      # uncomment to debug the script
+      # set -x
+      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
+      if [ $? -gt 0 ]; then
+        RC = $?
+        echo "Unable to clone git repository..."
+        exit $RC
+      fi
+      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_dockerfile.sh
+  - name: Check registry
+    type: builder
+    build_type: cr
+    artifact_dir: ''
+    target:
+      region_id: ${REGISTRY_REGION_ID}
+      api_key: ${API_KEY}
+    namespace: ${REGISTRY_NAMESPACE}
+    image_name: ${APP_NAME}
+    script: |-
+      #!/bin/bash
+      # uncomment to debug the script
+      # set -x
+      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
+      if [ $? -gt 0 ]; then
+        RC = $?
+        echo "Unable to clone git repository..."
+        exit $RC
+      fi
+      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_registry.sh
+  - name: Build container image
+    type: builder
+    build_type: cr
+    artifact_dir: output
+    target:
+      region_id: ${REGISTRY_REGION_ID}
+      api_key: ${API_KEY}
+    namespace: ${REGISTRY_NAMESPACE}
+    image_name: ${APP_NAME}
+    script: |
+      #!/bin/bash
+      # uncomment to debug the script
+      # set -x
+      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
+      if [ $? -gt 0 ]; then
+        RC = $?
+        echo "Unable to clone git repository..."
+        exit $RC
+      fi
+      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/build_image.sh
+  - name: Check vulnerabilities
+    type: tester
+    test_type: vulnerabilityadvisor
+    use_image_from_build_input: true
+    target:
+      region_id: ${REGISTRY_REGION_ID}
+      api_key: ${API_KEY}
+    namespace: ${REGISTRY_NAMESPACE}
+    image_name: ${APP_NAME}
+    script: |
+      #!/bin/bash
+      # uncomment to debug the script
+      # set -x
+      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
+      if [ $? -gt 0 ]; then
+        RC = $?
+        echo "Unable to clone git repository..."
+        exit $RC
+      fi
+      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_vulnerabilities.sh
+  - name: Create MR to update manifest file
+    type: builder
+    build_type: shell
+    script: |
+      #!/bin/bash
+      # uncomment to debug the script
+      # set -x
+      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
+      if [ $? -gt 0 ]; then
+        RC = $?
+        echo "Unable to clone git repository..."
+        exit $RC
+      fi
+      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/create_mr_to_update_manifest.sh

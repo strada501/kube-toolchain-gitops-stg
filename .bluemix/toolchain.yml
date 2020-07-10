@@ -1,0 +1,98 @@
+version: '2'
+messages:
+  $i18n: locales.yml
+template:
+  name:
+    $ref: "#/messages/template.name"
+  description:
+    $ref: "#/messages/template.description"
+  header: '![](toolchain.svg?localize)'
+  icon: secure-lock-kubernetes.svg
+  required:
+    - build
+    - deploy
+    - repo_app
+    - repo_ops
+  info:
+    git url: >
+      "[" + $env.repository + "]" +
+        "(" + $env.repository + ")"
+    git branch: >
+      "[" + $env.branch + "]" +
+        "(" + $env.repository +
+          "/tree/" + $env.branch + ")"
+toolchain:
+  template:
+    getting_started:
+      $ref: "#/messages/template.gettingStarted"
+services:
+  repo_app:
+    service_id: hostedgit
+    parameters:
+      repo_name: '{{form.hostedgit.parameters.app-repo_name}}'
+      repo_url: '{{form.hostedgit.parameters.app-repo_url}}'
+      type: link
+      has_issues: true
+      enable_traceability: true
+  repo_ops:
+    service_id: hostedgit
+    parameters:
+      repo_name: '{{form.hostedgit.parameters.ops-repo_name}}'
+      repo_url: '{{form.hostedgit.parameters.ops-repo_url}}'
+      type: link
+      has_issues: true
+      enable_traceability: true
+  build:
+    service_id: pipeline
+    parameters:
+      services:
+        - repo_app
+      name: '{{toolchain.name}}-build'
+      ui-pipeline: true
+      configuration:
+        content:
+          $text: pipeline_build.yml
+        env:
+          GIT_REPO: repo_app
+          GITLAB_ACCESS_TOKEN: '{{form.pipeline.parameters.gitlab-access-token}}'
+          GITLAB_DOMAIN: 'jp-tok.git.cloud.ibm.com'
+          GITLAB_GROUP_NAME: 'STRADA'
+          GITLAB_TOOLCHAIN_GROUP_NAME: 'toolchain'
+          GITLAB_COMMONS_PROJECT_NAME: 'commons'
+          GITLAB_OPS_PROJECT_NAME: '{{form.pipeline.parameters.gitlab-ops-project-name}}'
+          GITLAB_OPS_PROJECT_ID: '{{form.pipeline.parameters.gitlab-ops-project-id}}'
+          APP_NAME: '{{form.pipeline.parameters.app-name}}'
+          REGISTRY_REGION_ID: '{{form.pipeline.parameters.registry-region}}'
+          REGISTRY_NAMESPACE: '{{form.pipeline.parameters.registry-namespace}}'
+          API_KEY: '{{form.pipeline.parameters.api-key}}'
+        execute: false
+  deploy:
+    service_id: pipeline
+    parameters:
+      services:
+        - repo_ops
+      name: '{{toolchain.name}}-deploy'
+      ui-pipeline: true
+      configuration:
+        content:
+          $text: pipeline_deploy.yml
+        env:
+          GIT_REPO: repo_ops
+          GITLAB_ACCESS_TOKEN: '{{form.pipeline.parameters.gitlab-access-token}}'
+          GITLAB_DOMAIN: 'jp-tok.git.cloud.ibm.com'
+          GITLAB_GROUP_NAME: 'STRADA'
+          GITLAB_TOOLCHAIN_GROUP_NAME: 'toolchain'
+          GITLAB_COMMONS_PROJECT_NAME: 'commons'
+          API_KEY: '{{form.pipeline.parameters.api-key}}'
+          REGION_ID: '{{form.pipeline.parameters.region}}'
+          RESOURCE_GROUP: '{{form.pipeline.parameters.resource-group}}'
+          CLUSTER_NAME: '{{form.pipeline.parameters.cluster-name}}'
+          CLUSTER_NAMESPACE: '{{form.pipeline.parameters.cluster-namespace}}'
+        execute: false
+form:
+  pipeline:
+    schema:
+      $ref: deploy.json
+  hostedgit:
+    schema:
+      $ref: repos.json

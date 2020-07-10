@@ -1,0 +1,84 @@
+---
+defaultBaseImageVersion: latest
+stages:
+- name: DEPLOY
+  inputs:
+  - type: git
+    branch: release
+    service: ${GIT_REPO}
+  triggers:
+  - type: git
+    enabled: false
+  properties:
+  - name: GITLAB_ACCESS_TOKEN
+    value: ${GITLAB_ACCESS_TOKEN}
+    type: secure
+  - name: GITLAB_DOMAIN
+    value: ${GITLAB_DOMAIN}
+    type: text
+  - name: GITLAB_GROUP_NAME
+    value: ${GITLAB_GROUP_NAME}
+    type: text
+  - name: GITLAB_TOOLCHAIN_GROUP_NAME
+    value: ${GITLAB_TOOLCHAIN_GROUP_NAME}
+    type: text
+  - name: GITLAB_COMMONS_PROJECT_NAME
+    value: ${GITLAB_COMMONS_PROJECT_NAME}
+    type: text
+  - name: IMAGE_NAME
+    value: undefined
+    type: text
+  - name: IMAGE_TAG
+    value: undefined
+    type: text
+  - name: REGISTRY_URL
+    value: undefined
+    type: text
+  - name: REGISTRY_NAMESPACE
+    value: undefined
+    type: text
+  - name: CLUSTER_NAMESPACE
+    value: ${CLUSTER_NAMESPACE}
+    type: text
+  - name: DEPLOYMENT_FILE
+    value: ./manifests/stg/deployment.yml
+    type: text
+  - name: APP_URL
+    value: undefined
+    type: text
+  jobs:
+  - name: Deploy to Kubernetes
+    type: deployer
+    target:
+      region_id: ${REGION_ID}
+      api_key: ${API_KEY}
+      kubernetes_cluster: ${CLUSTER_NAME}
+    script: |
+      #!/bin/bash
+      # uncomment to debug the script
+      # set -x
+      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
+      if [ $? -gt 0 ]; then
+        RC = $?
+        echo "Unable to clone git repository..."
+        exit $RC
+      fi
+      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_and_deploy_kubectl.sh
+  - name: Check health
+    type: deployer
+    target:
+      region_id: ${REGION_ID}
+      resource_group: ${RESOURCE_GROUP}
+      api_key: ${API_KEY}
+      kubernetes_cluster: ${CLUSTER_NAME}
+    script: |-
+      #!/bin/bash
+      # uncomment to debug the script
+      # set -x
+      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
+      if [ $? -gt 0 ]; then
+        RC = $?
+        echo "Unable to clone git repository..."
+        exit $RC
+      fi
+      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_health.sh
