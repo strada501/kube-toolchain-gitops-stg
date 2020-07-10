@@ -95,12 +95,6 @@ stages:
   - name: GITLAB_GROUP_NAME
     value: ${GITLAB_GROUP_NAME}
     type: text
-  - name: GITLAB_TOOLCHAIN_GROUP_NAME
-    value: ${GITLAB_TOOLCHAIN_GROUP_NAME}
-    type: text
-  - name: GITLAB_COMMONS_PROJECT_NAME
-    value: ${GITLAB_COMMONS_PROJECT_NAME}
-    type: text
   - name: GITLAB_OPS_PROJECT_NAME
     value: ${GITLAB_OPS_PROJECT_NAME}
     type: text
@@ -126,13 +120,7 @@ stages:
       #!/bin/bash
       # uncomment to debug the script
       # set -x
-      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
-      if [ $? -gt 0 ]; then
-        RC = $?
-        echo "Unable to clone git repository..."
-        exit $RC
-      fi
-      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_dockerfile.sh
+      source <(curl -sSL "https://raw.githubusercontent.com/strada501/kube-toolchain-gitops-commons/master/scripts/check_dockerfile.sh")
   - name: Check registry
     type: builder
     build_type: cr
@@ -146,13 +134,7 @@ stages:
       #!/bin/bash
       # uncomment to debug the script
       # set -x
-      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
-      if [ $? -gt 0 ]; then
-        RC = $?
-        echo "Unable to clone git repository..."
-        exit $RC
-      fi
-      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_registry.sh
+      source <(curl -sSL "https://raw.githubusercontent.com/strada501/kube-toolchain-gitops-commons/master/scripts/check_registry.sh")
   - name: Build container image
     type: builder
     build_type: cr
@@ -166,13 +148,7 @@ stages:
       #!/bin/bash
       # uncomment to debug the script
       # set -x
-      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
-      if [ $? -gt 0 ]; then
-        RC = $?
-        echo "Unable to clone git repository..."
-        exit $RC
-      fi
-      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/build_image.sh
+      source <(curl -sSL "https://raw.githubusercontent.com/strada501/kube-toolchain-gitops-commons/master/scripts/build_image.sh")
   - name: Check vulnerabilities
     type: tester
     test_type: vulnerabilityadvisor
@@ -186,13 +162,7 @@ stages:
       #!/bin/bash
       # uncomment to debug the script
       # set -x
-      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
-      if [ $? -gt 0 ]; then
-        RC = $?
-        echo "Unable to clone git repository..."
-        exit $RC
-      fi
-      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_vulnerabilities.sh
+      source <(curl -sSL "https://raw.githubusercontent.com/strada501/kube-toolchain-gitops-commons/master/scripts/check_vulnerabilities.sh")
   - name: Create MR to update manifest file
     type: builder
     build_type: shell
@@ -200,10 +170,4 @@ stages:
       #!/bin/bash
       # uncomment to debug the script
       # set -x
-      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
-      if [ $? -gt 0 ]; then
-        RC = $?
-        echo "Unable to clone git repository..."
-        exit $RC
-      fi
-      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/create_mr_to_update_manifest.sh
+      source <(curl -sSL "https://raw.githubusercontent.com/strada501/kube-toolchain-gitops-commons/master/scripts/create_mr_to_update_manifest.sh")

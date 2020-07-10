@@ -19,12 +19,6 @@ stages:
   - name: GITLAB_GROUP_NAME
     value: ${GITLAB_GROUP_NAME}
     type: text
-  - name: GITLAB_TOOLCHAIN_GROUP_NAME
-    value: ${GITLAB_TOOLCHAIN_GROUP_NAME}
-    type: text
-  - name: GITLAB_COMMONS_PROJECT_NAME
-    value: ${GITLAB_COMMONS_PROJECT_NAME}
-    type: text
   - name: IMAGE_NAME
     value: undefined
     type: text
@@ -57,13 +51,7 @@ stages:
       #!/bin/bash
       # uncomment to debug the script
       # set -x
-      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
-      if [ $? -gt 0 ]; then
-        RC = $?
-        echo "Unable to clone git repository..."
-        exit $RC
-      fi
-      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_and_deploy_kubectl.sh
+      source <(curl -sSL "https://raw.githubusercontent.com/strada501/kube-toolchain-gitops-commons/master/scripts/check_and_deploy_kubectl.sh")
   - name: Check health
     type: deployer
     target:
@@ -75,10 +63,4 @@ stages:
       #!/bin/bash
       # uncomment to debug the script
       # set -x
-      git clone https://oauth2:"${GITLAB_ACCESS_TOKEN}"@${GITLAB_DOMAIN}/${GITLAB_GROUP_NAME}/${GITLAB_TOOLCHAIN_GROUP_NAME}/${GITLAB_COMMONS_PROJECT_NAME}.git
-      if [ $? -gt 0 ]; then
-        RC = $?
-        echo "Unable to clone git repository..."
-        exit $RC
-      fi
-      source ./${GITLAB_COMMONS_PROJECT_NAME}/scripts/check_health.sh
+      source <(curl -sSL "https://raw.githubusercontent.com/strada501/kube-toolchain-gitops-commons/master/scripts/check_health.sh")
