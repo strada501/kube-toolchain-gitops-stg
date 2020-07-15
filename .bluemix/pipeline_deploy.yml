@@ -7,8 +7,8 @@ stages:
     branch: release
     service: ${GIT_REPO}
   triggers:
-  - type: git
-    enabled: false
+  - type: commit
+    events: '{"push":false, "pull_request":true, "pull_request_closed":false}'
   properties:
   - name: GITLAB_ACCESS_TOKEN
     value: ${GITLAB_ACCESS_TOKEN}
